@@ -1,0 +1,1 @@
+generate-code: dart run pigeon --input pigeons/link_os_multiplatform_sdk.dart
