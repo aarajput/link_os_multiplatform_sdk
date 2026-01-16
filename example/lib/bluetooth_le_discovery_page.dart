@@ -119,9 +119,21 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Bluetooth LE Discovery')),
-      body: _isScanning
-          ? _printers.isEmpty
+      body: Column(
+        children: [
+          if (!_isScanning)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: _startScanning,
+                child: const Text('Restart Scanning'),
+              ),
+            ),
+          Expanded(
+            child: _isScanning && _printers.isEmpty
                 ? const Center(child: CircularProgressIndicator())
+                : _printers.isEmpty
+                ? const Center(child: Text('No printers found'))
                 : ListView.builder(
                     itemCount: _printers.length,
                     itemBuilder: (context, index) {
@@ -136,8 +148,10 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
                             : () => _printToPrinter(printer),
                       );
                     },
-                  )
-          : const Center(child: Text('Scanning stopped')),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
