@@ -32,6 +32,22 @@ class LinkOsMultiplatformSdk {
   Future<void> printOverBluetoothLeWithoutParing(String address, String zpl) {
     return _hostApi.printOverBluetoothLeWithoutParing(address, zpl);
   }
+
+  Future<bool> isBluetoothEnabled() {
+    return _hostApi.isBluetoothEnabled();
+  }
+
+  Future<bool> requestBluetoothEnable() {
+    return _hostApi.requestBluetoothEnable();
+  }
+
+  Future<bool> isLocationEnabled() {
+    return _hostApi.isLocationEnabled();
+  }
+
+  Future<bool> requestLocationEnable() {
+    return _hostApi.requestLocationEnable();
+  }
 }
 
 class _LinkOsMultiplatformSdkFlutterApiImpl

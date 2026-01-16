@@ -203,6 +203,10 @@ protocol LinkOsMultiplatformSdkHostApi {
   func requestBluetoothLePermissions(completion: @escaping (Result<Bool, Error>) -> Void)
   func startBluetoothLeScanning(completion: @escaping (Result<Void, Error>) -> Void)
   func printOverBluetoothLeWithoutParing(address: String, zpl: String, completion: @escaping (Result<Void, Error>) -> Void)
+  func isBluetoothEnabled() throws -> Bool
+  func requestBluetoothEnable(completion: @escaping (Result<Bool, Error>) -> Void)
+  func isLocationEnabled() throws -> Bool
+  func requestLocationEnable(completion: @escaping (Result<Bool, Error>) -> Void)
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -258,6 +262,62 @@ class LinkOsMultiplatformSdkHostApiSetup {
       }
     } else {
       printOverBluetoothLeWithoutParingChannel.setMessageHandler(nil)
+    }
+    let isBluetoothEnabledChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.isBluetoothEnabled\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      isBluetoothEnabledChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.isBluetoothEnabled()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      isBluetoothEnabledChannel.setMessageHandler(nil)
+    }
+    let requestBluetoothEnableChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.requestBluetoothEnable\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      requestBluetoothEnableChannel.setMessageHandler { _, reply in
+        api.requestBluetoothEnable { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      requestBluetoothEnableChannel.setMessageHandler(nil)
+    }
+    let isLocationEnabledChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.isLocationEnabled\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      isLocationEnabledChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.isLocationEnabled()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      isLocationEnabledChannel.setMessageHandler(nil)
+    }
+    let requestLocationEnableChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.requestLocationEnable\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      requestLocationEnableChannel.setMessageHandler { _, reply in
+        api.requestLocationEnable { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      requestLocationEnableChannel.setMessageHandler(nil)
     }
   }
 }

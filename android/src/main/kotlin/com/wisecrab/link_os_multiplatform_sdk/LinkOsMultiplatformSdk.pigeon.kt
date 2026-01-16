@@ -139,6 +139,10 @@ interface LinkOsMultiplatformSdkHostApi {
   fun requestBluetoothLePermissions(callback: (Result<Boolean>) -> Unit)
   fun startBluetoothLeScanning(callback: (Result<Unit>) -> Unit)
   fun printOverBluetoothLeWithoutParing(address: String, zpl: String, callback: (Result<Unit>) -> Unit)
+  fun isBluetoothEnabled(): Boolean
+  fun requestBluetoothEnable(callback: (Result<Boolean>) -> Unit)
+  fun isLocationEnabled(): Boolean
+  fun requestLocationEnable(callback: (Result<Boolean>) -> Unit)
 
   companion object {
     /** The codec used by LinkOsMultiplatformSdkHostApi. */
@@ -197,6 +201,72 @@ interface LinkOsMultiplatformSdkHostApi {
                 reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapError(error))
               } else {
                 reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.isBluetoothEnabled$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.isBluetoothEnabled())
+            } catch (exception: Throwable) {
+              LinkOsMultiplatformSdkPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.requestBluetoothEnable$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.requestBluetoothEnable{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.isLocationEnabled$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.isLocationEnabled())
+            } catch (exception: Throwable) {
+              LinkOsMultiplatformSdkPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.requestLocationEnable$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.requestLocationEnable{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapResult(data))
               }
             }
           }

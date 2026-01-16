@@ -2,10 +2,15 @@ package com.wisecrab.link_os_multiplatform_sdk
 
 import android.Manifest
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import android.os.Looper
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.zebra.sdk.btleComm.BluetoothLeConnection
@@ -21,6 +26,8 @@ class LinkOsMultiplatformSdkHostApiImpl(
 
     var activity: Activity? = null
     private var requestBluetoothLePermissionsCallback: ((Result<Boolean>) -> Unit)? = null
+    private var requestBluetoothEnableCallback: ((Result<Boolean>) -> Unit)? = null
+    private var requestLocationEnableCallback: ((Result<Boolean>) -> Unit)? = null
 
     override fun requestBluetoothLePermissions(callback: (Result<Boolean>) -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
@@ -98,6 +105,70 @@ class LinkOsMultiplatformSdkHostApiImpl(
         }.start()
     }
 
+    override fun isBluetoothEnabled(): Boolean {
+        val bluetoothManager =
+            ContextCompat.getSystemService(
+                context,
+                BluetoothManager::class.java
+            )
+        val bluetoothAdapter = bluetoothManager?.adapter
+
+        return bluetoothAdapter?.isEnabled == true
+    }
+
+    override fun requestBluetoothEnable(callback: (Result<Boolean>) -> Unit) {
+        val bluetoothManager = ContextCompat.getSystemService(
+            context,
+            BluetoothManager::class.java
+        )
+        if (bluetoothManager == null) {
+            return callback(Result.success(false))
+        }
+        if (bluetoothManager.adapter.isEnabled) {
+            return callback(Result.success(true))
+        }
+        if (activity == null) {
+            return callback(Result.success(false))
+        }
+        val intent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return callback(Result.failure(Exception("BLUETOOTH_CONNECT permission is required")))
+        }
+        requestBluetoothEnableCallback = callback
+        activity!!.startActivityForResult(intent, REQUEST_BLUETOOTH_ENABLE)
+    }
+
+    override fun isLocationEnabled(): Boolean {
+        val locationManager =
+            ContextCompat.getSystemService(context, LocationManager::class.java) ?: return false
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            locationManager.isLocationEnabled
+        } else {
+            try {
+                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                        locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
+    override fun requestLocationEnable(callback: (Result<Boolean>) -> Unit) {
+        if (isLocationEnabled()) {
+            return callback(Result.success(true))
+        }
+        if (activity == null) {
+            return callback(Result.success(false))
+        }
+        val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+        activity!!.startActivityForResult(intent, REQUEST_LOCATION_ENABLE)
+    }
+
     fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String?>,
@@ -114,8 +185,28 @@ class LinkOsMultiplatformSdkHostApiImpl(
         return false
     }
 
+    fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ): Boolean {
+        if (requestCode == REQUEST_BLUETOOTH_ENABLE && requestBluetoothEnableCallback != null) {
+            requestBluetoothEnableCallback!!.invoke(Result.success(resultCode == Activity.RESULT_OK))
+            requestBluetoothEnableCallback = null
+            return true
+        }
+        if (requestCode == REQUEST_LOCATION_ENABLE && requestLocationEnableCallback != null) {
+            requestLocationEnableCallback!!.invoke(Result.success(resultCode == Activity.RESULT_OK))
+            requestLocationEnableCallback = null
+        }
+        return false
+    }
+
+
     companion object {
         const val REQUEST_BLUETOOTH_LE = 1
+        const val REQUEST_BLUETOOTH_ENABLE = 2
+        const val REQUEST_LOCATION_ENABLE = 3
     }
 }
 
