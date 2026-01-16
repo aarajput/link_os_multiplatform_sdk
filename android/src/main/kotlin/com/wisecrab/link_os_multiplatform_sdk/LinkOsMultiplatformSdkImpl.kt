@@ -8,8 +8,8 @@ import android.os.Build
 import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.zebra.sdk.btleComm.BluetoothLeConnection
 import com.zebra.sdk.btleComm.BluetoothLeDiscoverer
-import com.zebra.sdk.comm.BluetoothConnectionInsecure
 import com.zebra.sdk.printer.discovery.DiscoveredPrinter
 import com.zebra.sdk.printer.discovery.DiscoveryHandler
 
@@ -73,7 +73,7 @@ class LinkOsMultiplatformSdkHostApiImpl(
         Thread {
             try {
                 // Instantiate insecure connection for given Bluetooth MAC Address.
-                val thePrinterConn = BluetoothConnectionInsecure(address)
+                val thePrinterConn = BluetoothLeConnection(address, context)
 
                 // Initialize
                 Looper.prepare()
