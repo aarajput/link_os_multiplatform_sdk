@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "link_os_multiplatform_sdk_example",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/example"
+    },
+    {
+      "name": "link_os_multiplatform_sdk_example (profile mode)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/example"
+    },
+    {
+      "name": "link_os_multiplatform_sdk_example (release mode)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/example"
+    }
+  ]
+}

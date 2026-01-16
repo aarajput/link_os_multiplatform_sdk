@@ -1,8 +1,49 @@
+import 'dart:async';
 
-import 'link_os_multiplatform_sdk_platform_interface.dart';
+import 'package:link_os_multiplatform_sdk/link_os_multiplatform_sdk.pigeon.dart';
 
 class LinkOsMultiplatformSdk {
-  Future<String?> getPlatformVersion() {
-    return LinkOsMultiplatformSdkPlatform.instance.getPlatformVersion();
+  static final instance = LinkOsMultiplatformSdk._();
+  final _hostApi = LinkOsMultiplatformSdkHostApi();
+  late final _LinkOsMultiplatformSdkFlutterApiImpl _flutterApi;
+
+  final _onBluetoothLePrintersDetectedController =
+      StreamController<List<BluetoothLePrinterData>>.broadcast();
+  Stream<List<BluetoothLePrinterData>> get onBluetoothLePrintersDetected =>
+      _onBluetoothLePrintersDetectedController.stream;
+
+  LinkOsMultiplatformSdk._() {
+    _flutterApi = _LinkOsMultiplatformSdkFlutterApiImpl(
+      onBluetoothLePrintersDetectedController:
+          _onBluetoothLePrintersDetectedController,
+    );
+
+    LinkOsMultiplatformSdkFlutterApi.setUp(_flutterApi);
+  }
+
+  Future<void> startBluetoothLeScanning() {
+    return _hostApi.startBluetoothLeScanning();
+  }
+
+  Future<bool> requestBluetoothLePermissions() {
+    return _hostApi.requestBluetoothLePermissions();
+  }
+
+  Future<void> printOverBluetoothLeWithoutParing(String address, String zpl) {
+    return _hostApi.printOverBluetoothLeWithoutParing(address, zpl);
+  }
+}
+
+class _LinkOsMultiplatformSdkFlutterApiImpl
+    implements LinkOsMultiplatformSdkFlutterApi {
+  final StreamController onBluetoothLePrintersDetectedController;
+  _LinkOsMultiplatformSdkFlutterApiImpl({
+    required this.onBluetoothLePrintersDetectedController,
+  });
+  @override
+  void onBluetoothLePrintersDetected(
+    List<BluetoothLePrinterData> printers,
+  ) {
+    onBluetoothLePrintersDetectedController.sink.add(printers);
   }
 }

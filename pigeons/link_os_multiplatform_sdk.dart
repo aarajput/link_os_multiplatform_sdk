@@ -16,7 +16,13 @@ import 'package:pigeon/pigeon.dart';
 )
 @HostApi()
 abstract class LinkOsMultiplatformSdkHostApi {
+  @async
+  bool requestBluetoothLePermissions();
+  @async
   void startBluetoothLeScanning();
+
+  @async
+  void printOverBluetoothLeWithoutParing(String address, String zpl);
 }
 
 class BluetoothLePrinterData {
@@ -32,6 +38,4 @@ class BluetoothLePrinterData {
 @FlutterApi()
 abstract class LinkOsMultiplatformSdkFlutterApi {
   void onBluetoothLePrintersDetected(List<BluetoothLePrinterData> printerData);
-  void onBluetoothLeScanningFinished();
-  void onBluetoothLeScanningError(String? error);
 }
