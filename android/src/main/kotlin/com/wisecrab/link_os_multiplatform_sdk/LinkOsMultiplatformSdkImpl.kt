@@ -26,10 +26,18 @@ class LinkOsMultiplatformSdkHostApiImpl(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             return callback(Result.success(true))
         }
-        val hasPermissions = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.BLUETOOTH_SCAN
-        ) == PackageManager.PERMISSION_GRANTED
+        val requiredPermissions = arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+        val hasPermissions = requiredPermissions.all { permission ->
+            ContextCompat.checkSelfPermission(
+                context,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
+        }
         if (hasPermissions) {
             return callback(Result.success(true))
         }
@@ -39,8 +47,8 @@ class LinkOsMultiplatformSdkHostApiImpl(
         requestBluetoothLePermissionsCallback = callback
         ActivityCompat.requestPermissions(
             activity!!,
-            arrayOf(Manifest.permission.BLUETOOTH_SCAN),
-            REQUEST_BLUETOOTH_SCAN
+            requiredPermissions,
+            REQUEST_BLUETOOTH_LE
         )
     }
 
@@ -95,10 +103,10 @@ class LinkOsMultiplatformSdkHostApiImpl(
         permissions: Array<out String?>,
         grantResults: IntArray
     ): Boolean {
-        if (requestCode == REQUEST_BLUETOOTH_SCAN && requestBluetoothLePermissionsCallback != null) {
+        if (requestCode == REQUEST_BLUETOOTH_LE && requestBluetoothLePermissionsCallback != null) {
             val granted =
                 grantResults.isNotEmpty() &&
-                        grantResults[0] == PackageManager.PERMISSION_GRANTED
+                        grantResults.all { it == PackageManager.PERMISSION_GRANTED }
             requestBluetoothLePermissionsCallback!!.invoke(Result.success(granted))
             requestBluetoothLePermissionsCallback = null
             return true
@@ -107,7 +115,7 @@ class LinkOsMultiplatformSdkHostApiImpl(
     }
 
     companion object {
-        const val REQUEST_BLUETOOTH_SCAN = 1
+        const val REQUEST_BLUETOOTH_LE = 1
     }
 }
 
