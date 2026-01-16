@@ -11,17 +11,19 @@ class LinkOsMultiplatformSdkPlugin :
     private lateinit var channel: MethodChannel
     private lateinit var flutterApi: LinkOsMultiplatformSdkFlutterApi
     private lateinit var hostApi: LinkOsMultiplatformSdkHostApiImpl
-    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+    var activityPluginBinding: ActivityPluginBinding? = null
+
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         flutterApi =
-            LinkOsMultiplatformSdkFlutterApi(flutterPluginBinding.binaryMessenger)
+            LinkOsMultiplatformSdkFlutterApi(binding.binaryMessenger)
         hostApi =
             LinkOsMultiplatformSdkHostApiImpl(
-                context = flutterPluginBinding.applicationContext,
+                context = binding.applicationContext,
                 flutterApi = flutterApi
             )
 
         LinkOsMultiplatformSdkHostApi.setUp(
-            flutterPluginBinding.binaryMessenger,
+            binding.binaryMessenger,
             hostApi
         )
     }
@@ -32,18 +34,26 @@ class LinkOsMultiplatformSdkPlugin :
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         hostApi.activity = binding.activity
+        activityPluginBinding = binding
+        binding.addRequestPermissionsResultListener(this)
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
         hostApi.activity = null
+        activityPluginBinding?.removeRequestPermissionsResultListener(this)
+        activityPluginBinding = null
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         hostApi.activity = binding.activity
+        activityPluginBinding = binding
+        binding.addRequestPermissionsResultListener(this);
     }
 
     override fun onDetachedFromActivity() {
         hostApi.activity = null
+        activityPluginBinding?.removeRequestPermissionsResultListener(this)
+        activityPluginBinding = null
     }
 
     override fun onRequestPermissionsResult(
