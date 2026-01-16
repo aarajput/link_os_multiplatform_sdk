@@ -197,7 +197,7 @@ class LinkOsMultiplatformSdkHostApiImpl(
             return true
         }
         if (requestCode == REQUEST_LOCATION_ENABLE && requestLocationEnableCallback != null) {
-            requestLocationEnableCallback!!.invoke(Result.success(resultCode == Activity.RESULT_OK))
+            requestLocationEnableCallback!!.invoke(Result.success(isLocationEnabled()))
             requestLocationEnableCallback = null
         }
         return false
