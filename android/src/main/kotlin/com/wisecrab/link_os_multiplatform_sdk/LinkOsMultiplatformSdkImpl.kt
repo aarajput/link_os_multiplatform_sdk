@@ -165,6 +165,7 @@ class LinkOsMultiplatformSdkHostApiImpl(
         if (activity == null) {
             return callback(Result.success(false))
         }
+        requestLocationEnableCallback = callback
         val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
         activity!!.startActivityForResult(intent, REQUEST_LOCATION_ENABLE)
     }
