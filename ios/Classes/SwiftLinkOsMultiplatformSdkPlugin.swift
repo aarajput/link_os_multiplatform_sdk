@@ -1,7 +1,7 @@
 import Flutter
 import UIKit
 
-public class LinkOsMultiplatformSdkPlugin: NSObject, FlutterPlugin {
+public class SwiftLinkOsMultiplatformSdkPlugin: NSObject, FlutterPlugin {
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let flutterApi = LinkOsMultiplatformSdkFlutterApi(
