@@ -24,13 +24,8 @@ abstract class LinkOsMultiplatformSdkHostApi {
   @async
   void printOverBluetoothLeWithoutParing(String address, String zpl);
 
-  bool isBluetoothEnabled();
-
   @async
   bool requestBluetoothEnable();
-
-  bool isLocationEnabled();
-
   @async
   bool requestLocationEnable();
 }

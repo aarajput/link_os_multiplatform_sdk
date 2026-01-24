@@ -14,7 +14,9 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
 
     private let flutterApi: LinkOsMultiplatformSdkFlutterApi
     private var bluetoothPermissionCompletion: ((Result<Bool, Error>) -> Void)?
+    private var bluetoothStateCompletion: ((Result<Bool, Error>) -> Void)?
     private var centralManager: CBCentralManager?
+    private var bluetoothStateManager: CBCentralManager?
 
     init(flutterApi: LinkOsMultiplatformSdkFlutterApi) {
         self.flutterApi = flutterApi
@@ -80,29 +82,61 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
 
     // MARK: - CBCentralManagerDelegate
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        checkAndCompletePermissions()
-    }
-
-    func isBluetoothEnabled() throws -> Bool {
-        let centralManager = CBCentralManager()
-        switch centralManager.state {
-        case .poweredOn:
-            return true
-        case .unauthorized:
-            throw NSError(
-                domain: "LinkOsMultiplatformSdk",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Bluetooth access is unauthorized"]
-            )
-        case .poweredOff, .unsupported, .resetting, .unknown:
-            return false
-        @unknown default:
-            return false
+        if bluetoothPermissionCompletion != nil {
+            checkAndCompletePermissions()
+        }
+        if bluetoothStateCompletion != nil {
+            checkBluetoothState(central)
         }
     }
 
-    func isLocationEnabled() throws -> Bool {
-        return true
+    func requestBluetoothEnable(completion: @escaping (Result<Bool, Error>) -> Void) {
+        // Check if we already have a manager with known state
+        if let manager = centralManager, manager.state != .unknown {
+            return completion(checkBluetoothStateResult(manager.state))
+        }
+
+        // Store completion handler
+        bluetoothStateCompletion = completion
+
+        // Create a new manager to check Bluetooth state
+        // The delegate callback will be called when state is determined
+        bluetoothStateManager = CBCentralManager(delegate: self, queue: nil)
+
+        // If state is already known (shouldn't happen but check anyway)
+        if let manager = bluetoothStateManager, manager.state != .unknown {
+            let result = checkBluetoothStateResult(manager.state)
+            bluetoothStateCompletion = nil
+            bluetoothStateManager = nil
+            completion(result)
+        }
+    }
+
+    private func checkBluetoothState(_ central: CBCentralManager) {
+        guard let completion = bluetoothStateCompletion else { return }
+
+        let result = checkBluetoothStateResult(central.state)
+        bluetoothStateCompletion = nil
+        bluetoothStateManager = nil
+        completion(result)
+    }
+
+    private func checkBluetoothStateResult(_ state: CBManagerState) -> Result<Bool, Error> {
+        switch state {
+        case .poweredOn:
+            return .success(true)
+        case .unauthorized:
+            return .failure(
+                NSError(
+                    domain: "LinkOsMultiplatformSdk",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Bluetooth access is unauthorized"]
+                ))
+        case .poweredOff, .unsupported, .resetting, .unknown:
+            return .success(false)
+        @unknown default:
+            return .success(false)
+        }
     }
 
     func startBluetoothLeScanning(completion: @escaping (Result<Void, Error>) -> Void) {
@@ -115,12 +149,7 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
         completion(.success(()))
     }
 
-    func requestBluetoothEnable(completion: @escaping (Result<Bool, Error>) -> Void) {
-        completion(.success((true)))
-    }
-
     func requestLocationEnable(completion: @escaping (Result<Bool, Error>) -> Void) {
         completion(.success((true)))
     }
-
 }

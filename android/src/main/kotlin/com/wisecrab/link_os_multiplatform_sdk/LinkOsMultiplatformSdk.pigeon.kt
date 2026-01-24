@@ -139,9 +139,7 @@ interface LinkOsMultiplatformSdkHostApi {
   fun requestBluetoothLePermissions(callback: (Result<Boolean>) -> Unit)
   fun startBluetoothLeScanning(callback: (Result<Unit>) -> Unit)
   fun printOverBluetoothLeWithoutParing(address: String, zpl: String, callback: (Result<Unit>) -> Unit)
-  fun isBluetoothEnabled(): Boolean
   fun requestBluetoothEnable(callback: (Result<Boolean>) -> Unit)
-  fun isLocationEnabled(): Boolean
   fun requestLocationEnable(callback: (Result<Boolean>) -> Unit)
 
   companion object {
@@ -209,21 +207,6 @@ interface LinkOsMultiplatformSdkHostApi {
         }
       }
       run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.isBluetoothEnabled$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { _, reply ->
-            val wrapped: List<Any?> = try {
-              listOf(api.isBluetoothEnabled())
-            } catch (exception: Throwable) {
-              LinkOsMultiplatformSdkPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.requestBluetoothEnable$separatedMessageChannelSuffix", codec)
         if (api != null) {
           channel.setMessageHandler { _, reply ->
@@ -236,21 +219,6 @@ interface LinkOsMultiplatformSdkHostApi {
                 reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapResult(data))
               }
             }
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.isLocationEnabled$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { _, reply ->
-            val wrapped: List<Any?> = try {
-              listOf(api.isLocationEnabled())
-            } catch (exception: Throwable) {
-              LinkOsMultiplatformSdkPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)

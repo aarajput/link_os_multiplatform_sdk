@@ -33,16 +33,8 @@ class LinkOsMultiplatformSdk {
     return _hostApi.printOverBluetoothLeWithoutParing(address, zpl);
   }
 
-  Future<bool> isBluetoothEnabled() {
-    return _hostApi.isBluetoothEnabled();
-  }
-
   Future<bool> requestBluetoothEnable() {
     return _hostApi.requestBluetoothEnable();
-  }
-
-  Future<bool> isLocationEnabled() {
-    return _hostApi.isLocationEnabled();
   }
 
   Future<bool> requestLocationEnable() {

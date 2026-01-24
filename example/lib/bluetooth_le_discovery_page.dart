@@ -45,40 +45,32 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
         return;
       }
 
-      final isBluetoothEnabled = await LinkOsMultiplatformSdk.instance
-          .isBluetoothEnabled();
-      if (!isBluetoothEnabled) {
-        final bluetoothEnabled = await LinkOsMultiplatformSdk.instance
-            .requestBluetoothEnable();
-        if (!bluetoothEnabled) {
-          setState(() {
-            _isScanning = false;
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Bluetooth enable denied')),
-            );
-          }
-          return;
+      final bluetoothEnabled = await LinkOsMultiplatformSdk.instance
+          .requestBluetoothEnable();
+      if (!bluetoothEnabled) {
+        setState(() {
+          _isScanning = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bluetooth enable denied')),
+          );
         }
+        return;
       }
 
-      final isLocationEnabled = await LinkOsMultiplatformSdk.instance
-          .isLocationEnabled();
-      if (!isLocationEnabled) {
-        final locationEnabled = await LinkOsMultiplatformSdk.instance
-            .requestLocationEnable();
-        if (!locationEnabled) {
-          setState(() {
-            _isScanning = false;
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location enable denied')),
-            );
-          }
-          return;
+      final locationEnabled = await LinkOsMultiplatformSdk.instance
+          .requestLocationEnable();
+      if (!locationEnabled) {
+        setState(() {
+          _isScanning = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location enable denied')),
+          );
         }
+        return;
       }
 
       _subscription = LinkOsMultiplatformSdk
