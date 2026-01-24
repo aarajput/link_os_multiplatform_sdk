@@ -7,6 +7,7 @@
 
 import CoreBluetooth
 import Foundation
+import ExternalAccessory
 
 class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi,
     CBCentralManagerDelegate
@@ -146,7 +147,99 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
     func printOverBluetoothLeWithoutParing(
         address: String, zpl: String, completion: @escaping (Result<Void, Error>) -> Void
     ) {
-        completion(.success(()))
+        let printQueue = DispatchQueue(label: "com.link_os_multiplatform_sdk.print_queue")
+        
+        printQueue.async {
+            // Register for local notifications to detect accessories
+            EAAccessoryManager.shared().registerForLocalNotifications()
+            
+            debugPrint("printOverBluetoothLeWithoutParing: address=\(address), zpl length=\(zpl.count)")
+                        
+            // Validate that we have a serial number
+            guard !serialNumber.isEmpty else {
+                let error = NSError(
+                    domain: "LinkOsMultiplatformSdk",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "No printer found. Please provide a valid MAC address or ensure a Zebra printer is connected."]
+                )
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            // Create connection using MfiBtPrinterConnection
+            // The Objective-C initializer returns 'id' which Swift bridges as optional MfiBtPrinterConnection?
+            guard let conn = MfiBtPrinterConnection(serialNumber: address) else {
+                let error = NSError(
+                    domain: "LinkOsMultiplatformSdk",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to create printer connection"]
+                )
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            debugPrint("Connection created successfully: \(conn)")
+            
+            // Open the connection
+            let openSuccess = conn.open()
+            guard openSuccess else {
+                let error = NSError(
+                    domain: "LinkOsMultiplatformSdk",
+                    code: 3,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to open printer connection"]
+                )
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            // Convert ZPL string to data
+            guard let zplData = zpl.data(using: .utf8) else {
+                conn.close()
+                let error = NSError(
+                    domain: "LinkOsMultiplatformSdk",
+                    code: 4,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to convert ZPL data to UTF-8"]
+                )
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            // Write data to printer
+            var writeError: NSError?
+            let writeSuccess = conn.write(zplData, error: &writeError)
+            
+            // Wait a bit to ensure data is sent
+            Thread.sleep(forTimeInterval: 1.0)
+            
+            debugPrint("Write success: \(writeSuccess), error: \(String(describing: writeError))")
+            
+            // Close the connection
+            conn.close()
+            
+            // Check if write was successful
+            if writeSuccess != -1 && writeError == nil {
+                DispatchQueue.main.async {
+                    completion(.success(()))
+                }
+            } else {
+                let error = writeError ?? NSError(
+                    domain: "LinkOsMultiplatformSdk",
+                    code: 5,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to write data to printer"]
+                )
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }
     }
 
     func requestLocationEnable(completion: @escaping (Result<Bool, Error>) -> Void) {
