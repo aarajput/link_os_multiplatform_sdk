@@ -10,7 +10,7 @@ public class LinkOsMultiplatformSdkPlugin: NSObject, FlutterPlugin {
     let hostApi = LinkOsMultiplatformSdkHostApiImpl(
       flutterApi: flutterApi,
     )
-    LinkOsMultiplatformSdkHostApiSetup.setUp(
+LinkOsMultiplatformSdkHostApiSetup.setUp(
       binaryMessenger: registrar.messenger(),
       api: hostApi,
     )
