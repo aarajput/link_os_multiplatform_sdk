@@ -18,6 +18,9 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
     private var bluetoothStateCompletion: ((Result<Bool, Error>) -> Void)?
     private var centralManager: CBCentralManager?
     private var bluetoothStateManager: CBCentralManager?
+    private var scanningCompletion: ((Result<Void, Error>) -> Void)?
+    private var discoveredPrinters: [String: BluetoothLePrinterData] = [:]
+    private var isScanning: Bool = false
 
     init(flutterApi: LinkOsMultiplatformSdkFlutterApi) {
         self.flutterApi = flutterApi
@@ -89,6 +92,10 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
         if bluetoothStateCompletion != nil {
             checkBluetoothState(central)
         }
+        // If we're waiting to start scanning and Bluetooth is now powered on, start scanning
+        if isScanning && scanningCompletion != nil && central.state == .poweredOn {
+            startScanning()
+        }
     }
 
     func requestBluetoothEnable(completion: @escaping (Result<Bool, Error>) -> Void) {
@@ -141,7 +148,128 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
     }
 
     func startBluetoothLeScanning(completion: @escaping (Result<Void, Error>) -> Void) {
-        completion(.success(()))
+        // Reset discovered printers
+        discoveredPrinters.removeAll()
+        
+        // Ensure we have a central manager
+        if centralManager == nil {
+            centralManager = CBCentralManager(delegate: self, queue: nil)
+        }
+        
+        guard let manager = centralManager else {
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Bluetooth central manager"]
+            )
+            completion(.failure(error))
+            return
+        }
+        
+        // Check Bluetooth state
+        switch manager.state {
+        case .poweredOn:
+            // Bluetooth is on, start scanning immediately
+            scanningCompletion = completion
+            isScanning = true
+            startScanning()
+            
+        case .poweredOff, .unauthorized, .unsupported, .resetting:
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Bluetooth is not available or not powered on"]
+            )
+            completion(.failure(error))
+            
+        case .unknown:
+            // State is unknown, wait for delegate callback
+            scanningCompletion = completion
+            isScanning = true
+            
+        @unknown default:
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Unknown Bluetooth state"]
+            )
+            completion(.failure(error))
+        }
+    }
+    
+    private func startScanning() {
+        guard let manager = centralManager, manager.state == .poweredOn else {
+            return
+        }
+        
+        // Scan for ALL BLE devices nearby by searching through the BLE advertisements.
+        // Zebra printer broadcasts its printer names in the advertisement.
+        // We use nil for services because Zebra printers don't broadcast services in advertisements.
+        manager.scanForPeripherals(
+            withServices: nil,
+            options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
+        )
+        
+        debugPrint("Started BLE scanning for Zebra printers")
+        
+        // Complete the scanning start request
+        if let completion = scanningCompletion {
+            scanningCompletion = nil
+            completion(.success(()))
+        }
+    }
+    
+    // This callback comes whenever a BLE printer is discovered
+    func centralManager(
+        _ central: CBCentralManager,
+        didDiscover peripheral: CBPeripheral,
+        advertisementData: [String: Any],
+        rssi RSSI: NSNumber
+    ) {
+        // Reject any where the value is above reasonable range
+        if RSSI.intValue > -15 {
+            return
+        }
+        
+        // Reject if the signal strength is too low to be close enough (Close is around -22dB)
+        if RSSI.intValue < -70 {
+            return
+        }
+        
+        // Ok, it's in the range. Let's add the device if it has a name
+        guard let peripheralName = peripheral.name, !peripheralName.isEmpty else {
+            return
+        }
+        
+        // Remove leading & trailing whitespace in peripheral.name
+        let trimmedName = peripheralName.trimmingCharacters(in: .whitespaces)
+        
+        // Skip if we already discovered this printer
+        if discoveredPrinters[trimmedName] != nil {
+            return
+        }
+        
+        // Use peripheral identifier as address (UUID string)
+        let address = peripheral.identifier.uuidString
+        
+        // Create printer data
+        let printerData = BluetoothLePrinterData(
+            name: trimmedName,
+            address: address
+        )
+        
+        // Add to discovered printers
+        discoveredPrinters[trimmedName] = printerData
+        
+        debugPrint("Discovered Zebra printer: \(trimmedName) (\(address)), RSSI: \(RSSI)")
+        
+        // Notify Flutter about the discovered printer
+        let printersList = Array(discoveredPrinters.values)
+        flutterApi.onBluetoothLePrintersDetected(printerData: printersList) { result in
+            if case .failure(let error) = result {
+                debugPrint("Failed to notify Flutter about discovered printer: \(error.localizedDescription)")
+            }
+        }
     }
 
     func printOverBluetoothLeWithoutParing(
@@ -155,8 +283,8 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
             
             debugPrint("printOverBluetoothLeWithoutParing: address=\(address), zpl length=\(zpl.count)")
                         
-            // Validate that we have a serial number
-            guard !serialNumber.isEmpty else {
+            // Validate that we have a mac address
+            guard !address.isEmpty else {
                 let error = NSError(
                     domain: "LinkOsMultiplatformSdk",
                     code: 1,
