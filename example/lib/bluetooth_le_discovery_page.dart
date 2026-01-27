@@ -98,7 +98,7 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
     }
   }
 
-  Future<void> _printToPrinter(BluetoothLePrinterData printer) async {
+  Future<void> _printToPrinter(String macAddress) async {
     setState(() {
       _isPrinting = true;
     });
@@ -112,7 +112,7 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
     try {
       const sampleZpl = '^XA^FO20,20^A0N,25,25^FDTest Print Link OS SDK^FS^XZ';
       await LinkOsMultiplatformSdk.instance.printOverBluetoothLeWithoutParing(
-        printer.address,
+        macAddress,
         sampleZpl,
       );
       if (mounted) {
@@ -152,9 +152,18 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
           if (!_isScanning)
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(
-                onPressed: _startScanning,
-                child: const Text('Restart Scanning'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ElevatedButton(
+                    onPressed: _startScanning,
+                    child: const Text('Restart Scanning'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _printToPrinter('00:07:4D:6E:04:CF'),
+                    child: const Text('Direct Print'),
+                  ),
+                ],
               ),
             ),
           Expanded(
@@ -173,7 +182,7 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
                         subtitle: Text(printer.address),
                         onTap: _isPrinting
                             ? null
-                            : () => _printToPrinter(printer),
+                            : () => _printToPrinter(printer.address),
                       );
                     },
                   ),
