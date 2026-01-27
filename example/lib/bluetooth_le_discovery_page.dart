@@ -160,7 +160,7 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
                     child: const Text('Restart Scanning'),
                   ),
                   ElevatedButton(
-                    onPressed: () => _printToPrinter('00:07:4D:6E:04:CF'),
+                    onPressed: () => _printToPrinter('00:07:4D:E6:04:CF'),
                     child: const Text('Direct Print'),
                   ),
                 ],
