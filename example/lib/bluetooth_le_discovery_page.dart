@@ -110,7 +110,8 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
     );
 
     try {
-      const sampleZpl = '^XA^FO20,20^A0N,25,25^FDTest Print Link OS SDK^FS^XZ';
+      const sampleZpl =
+          '^XA^FO20,20^A0N,25,25^FDTest Print Link OS SDK 1234^FS^XZ';
       await LinkOsMultiplatformSdk.instance.printOverBluetoothLeWithoutParing(
         macAddress,
         sampleZpl,
@@ -160,7 +161,8 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
                     child: const Text('Restart Scanning'),
                   ),
                   ElevatedButton(
-                    onPressed: () => _printToPrinter('00:07:4D:E6:04:CF'),
+                    onPressed: () =>
+                        _printToPrinter('59818D9F-D758-F7C5-B16A-C3813AF54FD8'),
                     child: const Text('Direct Print'),
                   ),
                 ],

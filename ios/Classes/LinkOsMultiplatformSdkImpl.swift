@@ -6,11 +6,18 @@
 //
 
 import CoreBluetooth
-import Foundation
 import ExternalAccessory
+import Foundation
+
+// Zebra printer BLE service UUIDs
+private let ZPRINTER_SERVICE_UUID = CBUUID(string: "38EB4A80-C570-11E3-9507-0002A5D5C51B")
+private let WRITE_TO_ZPRINTER_CHARACTERISTIC_UUID = CBUUID(
+    string: "38EB4A82-C570-11E3-9507-0002A5D5C51B")
+private let READ_FROM_ZPRINTER_CHARACTERISTIC_UUID = CBUUID(
+    string: "38EB4A81-C570-11E3-9507-0002A5D5C51B")
 
 class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi,
-    CBCentralManagerDelegate
+    CBCentralManagerDelegate, CBPeripheralDelegate
 {
 
     private let flutterApi: LinkOsMultiplatformSdkFlutterApi
@@ -20,7 +27,16 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
     private var bluetoothStateManager: CBCentralManager?
     private var scanningCompletion: ((Result<Void, Error>) -> Void)?
     private var discoveredPrinters: [String: BluetoothLePrinterData] = [:]
+    private var discoveredPeripherals: [String: CBPeripheral] = [:]  // Store peripherals by UUID
     private var isScanning: Bool = false
+
+    // Printing state
+    private var printCompletion: ((Result<Void, Error>) -> Void)?
+    private var printPeripheral: CBPeripheral?
+    private var writeCharacteristic: CBCharacteristic?
+    private var printZplData: Data?
+    private var targetAddress: String?  // MAC address or UUID to connect to
+    private var isConnectingDirectly: Bool = false
 
     init(flutterApi: LinkOsMultiplatformSdkFlutterApi) {
         self.flutterApi = flutterApi
@@ -150,22 +166,24 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
     func startBluetoothLeScanning(completion: @escaping (Result<Void, Error>) -> Void) {
         // Reset discovered printers
         discoveredPrinters.removeAll()
-        
+
         // Ensure we have a central manager
         if centralManager == nil {
             centralManager = CBCentralManager(delegate: self, queue: nil)
         }
-        
+
         guard let manager = centralManager else {
             let error = NSError(
                 domain: "LinkOsMultiplatformSdk",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Bluetooth central manager"]
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Failed to initialize Bluetooth central manager"
+                ]
             )
             completion(.failure(error))
             return
         }
-        
+
         // Check Bluetooth state
         switch manager.state {
         case .poweredOn:
@@ -173,20 +191,22 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
             scanningCompletion = completion
             isScanning = true
             startScanning()
-            
+
         case .poweredOff, .unauthorized, .unsupported, .resetting:
             let error = NSError(
                 domain: "LinkOsMultiplatformSdk",
                 code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "Bluetooth is not available or not powered on"]
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Bluetooth is not available or not powered on"
+                ]
             )
             completion(.failure(error))
-            
+
         case .unknown:
             // State is unknown, wait for delegate callback
             scanningCompletion = completion
             isScanning = true
-            
+
         @unknown default:
             let error = NSError(
                 domain: "LinkOsMultiplatformSdk",
@@ -196,12 +216,12 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
             completion(.failure(error))
         }
     }
-    
+
     private func startScanning() {
         guard let manager = centralManager, manager.state == .poweredOn else {
             return
         }
-        
+
         // Scan for ALL BLE devices nearby by searching through the BLE advertisements.
         // Zebra printer broadcasts its printer names in the advertisement.
         // We use nil for services because Zebra printers don't broadcast services in advertisements.
@@ -209,16 +229,16 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
             withServices: nil,
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
         )
-        
+
         debugPrint("Started BLE scanning for Zebra printers")
-        
+
         // Complete the scanning start request
         if let completion = scanningCompletion {
             scanningCompletion = nil
             completion(.success(()))
         }
     }
-    
+
     // This callback comes whenever a BLE printer is discovered
     func centralManager(
         _ central: CBCentralManager,
@@ -226,48 +246,104 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
+        // If we're connecting directly, check if this is the target device
+        if isConnectingDirectly, let targetAddr = targetAddress {
+            let peripheralUUID = peripheral.identifier.uuidString
+
+            // Check if this is a UUID format (contains hyphens)
+            let isUUIDFormat = targetAddr.contains("-")
+
+            if isUUIDFormat {
+                // Target is a UUID - only connect if UUIDs match exactly
+                if peripheralUUID.lowercased() == targetAddr.lowercased() {
+                    debugPrint(
+                        "Found target device by UUID during direct connection: \(peripheralUUID)")
+                    central.stopScan()
+                    isConnectingDirectly = false
+
+                    printPeripheral = peripheral
+                    peripheral.delegate = self
+                    central.connect(peripheral, options: nil)
+                    return
+                } else {
+                    // UUID doesn't match, skip this device
+                    debugPrint(
+                        "Skipping device \(peripheralUUID) - doesn't match target UUID \(targetAddr)"
+                    )
+                    return
+                }
+            } else {
+                // Target is a MAC address or other format - connect to first device with a name
+                // (Zebra printers typically broadcast their name)
+                if let peripheralName = peripheral.name, !peripheralName.isEmpty {
+                    let trimmedName = peripheralName.trimmingCharacters(in: .whitespaces)
+                    debugPrint(
+                        "Found device during direct connection (MAC mode): \(trimmedName) (\(peripheralUUID)), RSSI: \(RSSI)"
+                    )
+
+                    // Stop scanning and connect to this device
+                    central.stopScan()
+                    isConnectingDirectly = false
+
+                    printPeripheral = peripheral
+                    peripheral.delegate = self
+                    central.connect(peripheral, options: nil)
+                    return
+                }
+
+                // If no name, skip this device
+                return
+            }
+        }
+
+        // For regular scanning, filter by RSSI
         // Reject any where the value is above reasonable range
         if RSSI.intValue > -15 {
             return
         }
-        
+
         // Reject if the signal strength is too low to be close enough (Close is around -22dB)
         if RSSI.intValue < -70 {
             return
         }
-        
+
         // Ok, it's in the range. Let's add the device if it has a name
         guard let peripheralName = peripheral.name, !peripheralName.isEmpty else {
             return
         }
-        
+
         // Remove leading & trailing whitespace in peripheral.name
         let trimmedName = peripheralName.trimmingCharacters(in: .whitespaces)
-        
+
         // Skip if we already discovered this printer
         if discoveredPrinters[trimmedName] != nil {
             return
         }
-        
+
         // Use peripheral identifier as address (UUID string)
         let address = peripheral.identifier.uuidString
-        
+
+        // Store the peripheral for later connection
+        discoveredPeripherals[address] = peripheral
+
         // Create printer data
         let printerData = BluetoothLePrinterData(
             name: trimmedName,
             address: address
         )
-        
+
         // Add to discovered printers
         discoveredPrinters[trimmedName] = printerData
-        
+
         debugPrint("Discovered Zebra printer: \(trimmedName) (\(address)), RSSI: \(RSSI)")
-        
+
         // Notify Flutter about the discovered printer
         let printersList = Array(discoveredPrinters.values)
         flutterApi.onBluetoothLePrintersDetected(printerData: printersList) { result in
             if case .failure(let error) = result {
-                debugPrint("Failed to notify Flutter about discovered printer: \(error.localizedDescription)")
+                debugPrint(
+                    "Failed to notify Flutter about discovered printer: \(error.localizedDescription)"
+                )
             }
         }
     }
@@ -275,99 +351,326 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
     func printOverBluetoothLeWithoutParing(
         address: String, zpl: String, completion: @escaping (Result<Void, Error>) -> Void
     ) {
-        let printQueue = DispatchQueue(label: "com.link_os_multiplatform_sdk.print_queue")
-        
-        printQueue.async {
-            // Register for local notifications to detect accessories
-            EAAccessoryManager.shared().registerForLocalNotifications()
-            
-            debugPrint("printOverBluetoothLeWithoutParing: address=\(address), zpl length=\(zpl.count)")
-                        
-            // Validate that we have a mac address
-            guard !address.isEmpty else {
-                let error = NSError(
-                    domain: "LinkOsMultiplatformSdk",
-                    code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "No printer found. Please provide a valid MAC address or ensure a Zebra printer is connected."]
+        debugPrint("printOverBluetoothLeWithoutParing: address=\(address), zpl length=\(zpl.count)")
+
+        // Validate that we have an address
+        guard !address.isEmpty else {
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "No printer address provided"]
+            )
+            completion(.failure(error))
+            return
+        }
+
+        // Convert ZPL string to data
+        guard let zplData = (zpl + "\r\n").data(using: .utf8) else {
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to convert ZPL data to UTF-8"]
+            )
+            completion(.failure(error))
+            return
+        }
+
+        // Store print data and completion
+        printZplData = zplData
+        printCompletion = completion
+        targetAddress = address
+        isConnectingDirectly = true
+
+        // Ensure we have a central manager
+        if centralManager == nil {
+            centralManager = CBCentralManager(delegate: self, queue: nil)
+        }
+
+        guard let manager = centralManager else {
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Bluetooth central manager not available"]
+            )
+            completion(.failure(error))
+            return
+        }
+
+        // Check Bluetooth state
+        guard manager.state == .poweredOn else {
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: "Bluetooth is not powered on"]
+            )
+            completion(.failure(error))
+            return
+        }
+
+        // First, check if we have the peripheral stored from previous scanning
+        if let peripheral = discoveredPeripherals[address] {
+            debugPrint("Using stored peripheral: \(peripheral.identifier.uuidString)")
+            printPeripheral = peripheral
+            peripheral.delegate = self
+            manager.connect(peripheral, options: nil)
+            return
+        }
+
+        // Try to retrieve from system using UUID (if address is a UUID)
+        // This only works for peripherals that were previously connected
+        if let uuid = UUID(uuidString: address) {
+            let peripherals = manager.retrievePeripherals(withIdentifiers: [uuid])
+            if let foundPeripheral = peripherals.first {
+                debugPrint(
+                    "Retrieved peripheral from system cache: \(foundPeripheral.identifier.uuidString)"
                 )
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
+                printPeripheral = foundPeripheral
+                foundPeripheral.delegate = self
+                manager.connect(foundPeripheral, options: nil)
                 return
-            }
-            
-            // Create connection using MfiBtPrinterConnection
-            // The Objective-C initializer returns 'id' which Swift bridges as optional MfiBtPrinterConnection?
-            guard let conn = MfiBtPrinterConnection(serialNumber: address) else {
-                let error = NSError(
-                    domain: "LinkOsMultiplatformSdk",
-                    code: 2,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to create printer connection"]
-                )
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-                return
-            }
-            
-            debugPrint("Connection created successfully: \(conn)")
-            
-            // Open the connection
-            let openSuccess = conn.open()
-            guard openSuccess else {
-                let error = NSError(
-                    domain: "LinkOsMultiplatformSdk",
-                    code: 3,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to open printer connection"]
-                )
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-                return
-            }
-            
-            // Convert ZPL string to data
-            guard let zplData = zpl.data(using: .utf8) else {
-                conn.close()
-                let error = NSError(
-                    domain: "LinkOsMultiplatformSdk",
-                    code: 4,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to convert ZPL data to UTF-8"]
-                )
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-                return
-            }
-            
-            // Write data to printer
-            var writeError: NSError?
-            let writeSuccess = conn.write(zplData, error: &writeError)
-            
-            // Wait a bit to ensure data is sent
-            Thread.sleep(forTimeInterval: 1.0)
-            
-            debugPrint("Write success: \(writeSuccess), error: \(String(describing: writeError))")
-            
-            // Close the connection
-            conn.close()
-            
-            // Check if write was successful
-            if writeSuccess != -1 && writeError == nil {
-                DispatchQueue.main.async {
-                    completion(.success(()))
-                }
             } else {
-                let error = writeError ?? NSError(
-                    domain: "LinkOsMultiplatformSdk",
-                    code: 5,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to write data to printer"]
-                )
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
+                debugPrint("Peripheral not found in system cache, will scan for UUID: \(address)")
             }
         }
+
+        // If we have a UUID but it's not in the system cache, or if it's a MAC address,
+        // we need to scan to find the device
+        // Start scanning to find the device (without RSSI filtering for direct connection)
+        let addressType = UUID(uuidString: address) != nil ? "UUID" : "MAC address"
+        debugPrint(
+            "Starting scan to find Zebra printer (direct connection mode, \(addressType)): \(address)"
+        )
+        manager.scanForPeripherals(
+            withServices: nil,
+            options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
+        )
+
+        // Set a timeout for scanning (15 seconds)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15.0) {
+            if self.isConnectingDirectly, self.printPeripheral == nil {
+                // Stop scanning
+                manager.stopScan()
+                self.isConnectingDirectly = false
+
+                let error = NSError(
+                    domain: "LinkOsMultiplatformSdk",
+                    code: 7,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Printer not found. Please ensure the printer is powered on, in range, and Bluetooth is enabled."
+                    ]
+                )
+                if let completion = self.printCompletion {
+                    self.printCompletion = nil
+                    completion(.failure(error))
+                }
+                self.cleanupPrintState()
+            }
+        }
+    }
+
+    // MARK: - CBPeripheralDelegate for printing
+
+    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        debugPrint("Connected to peripheral: \(peripheral.identifier.uuidString)")
+
+        // Stop scanning if we're scanning
+        if isScanning {
+            central.stopScan()
+            isScanning = false
+        }
+
+        // Stop scanning if we were connecting directly
+        if isConnectingDirectly {
+            central.stopScan()
+            isConnectingDirectly = false
+        }
+
+        // Discover services
+        peripheral.discoverServices([ZPRINTER_SERVICE_UUID])
+    }
+
+    func centralManager(
+        _ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?
+    ) {
+        debugPrint(
+            "Failed to connect to peripheral: \(error?.localizedDescription ?? "Unknown error")")
+
+        let nsError =
+            error
+            ?? NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 7,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to connect to printer"]
+            )
+
+        if let completion = printCompletion {
+            printCompletion = nil
+            completion(.failure(nsError))
+        }
+
+        cleanupPrintState()
+    }
+
+    func centralManager(
+        _ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?
+    ) {
+        debugPrint("Disconnected from peripheral: \(error?.localizedDescription ?? "No error")")
+        cleanupPrintState()
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        if let error = error {
+            debugPrint("Error discovering services: \(error.localizedDescription)")
+            if let completion = printCompletion {
+                printCompletion = nil
+                completion(.failure(error))
+            }
+            cleanupPrintState()
+            return
+        }
+
+        guard let services = peripheral.services else {
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 8,
+                userInfo: [NSLocalizedDescriptionKey: "No services found on printer"]
+            )
+            if let completion = printCompletion {
+                printCompletion = nil
+                completion(.failure(error))
+            }
+            cleanupPrintState()
+            return
+        }
+
+        // Find the Zebra printer service
+        for service in services {
+            if service.uuid == ZPRINTER_SERVICE_UUID {
+                debugPrint("Found Zebra printer service, discovering characteristics...")
+                peripheral.discoverCharacteristics(
+                    [
+                        WRITE_TO_ZPRINTER_CHARACTERISTIC_UUID,
+                        READ_FROM_ZPRINTER_CHARACTERISTIC_UUID,
+                    ], for: service)
+                return
+            }
+        }
+
+        // Service not found
+        let error = NSError(
+            domain: "LinkOsMultiplatformSdk",
+            code: 9,
+            userInfo: [NSLocalizedDescriptionKey: "Zebra printer service not found"]
+        )
+        if let completion = printCompletion {
+            printCompletion = nil
+            completion(.failure(error))
+        }
+        cleanupPrintState()
+    }
+
+    func peripheral(
+        _ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?
+    ) {
+        if let error = error {
+            debugPrint("Error discovering characteristics: \(error.localizedDescription)")
+            if let completion = printCompletion {
+                printCompletion = nil
+                completion(.failure(error))
+            }
+            cleanupPrintState()
+            return
+        }
+
+        guard let characteristics = service.characteristics else {
+            let error = NSError(
+                domain: "LinkOsMultiplatformSdk",
+                code: 10,
+                userInfo: [NSLocalizedDescriptionKey: "No characteristics found"]
+            )
+            if let completion = printCompletion {
+                printCompletion = nil
+                completion(.failure(error))
+            }
+            cleanupPrintState()
+            return
+        }
+
+        // Find the write characteristic
+        for characteristic in characteristics {
+            if characteristic.uuid == WRITE_TO_ZPRINTER_CHARACTERISTIC_UUID {
+                writeCharacteristic = characteristic
+                debugPrint("Found write characteristic, sending ZPL data...")
+
+                // Write ZPL data to the characteristic
+                if let zplData = printZplData {
+                    peripheral.writeValue(zplData, for: characteristic, type: .withResponse)
+                } else {
+                    let error = NSError(
+                        domain: "LinkOsMultiplatformSdk",
+                        code: 11,
+                        userInfo: [NSLocalizedDescriptionKey: "ZPL data not available"]
+                    )
+                    if let completion = printCompletion {
+                        printCompletion = nil
+                        completion(.failure(error))
+                    }
+                    cleanupPrintState()
+                }
+                return
+            }
+        }
+
+        // Write characteristic not found
+        let error = NSError(
+            domain: "LinkOsMultiplatformSdk",
+            code: 12,
+            userInfo: [NSLocalizedDescriptionKey: "Write characteristic not found"]
+        )
+        if let completion = printCompletion {
+            printCompletion = nil
+            completion(.failure(error))
+        }
+        cleanupPrintState()
+    }
+
+    func peripheral(
+        _ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?
+    ) {
+        if let error = error {
+            debugPrint("Error writing to characteristic: \(error.localizedDescription)")
+            if let completion = printCompletion {
+                printCompletion = nil
+                completion(.failure(error))
+            }
+        } else {
+            debugPrint("Successfully wrote ZPL data to printer")
+            // Wait a bit to ensure data is sent
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if let completion = self.printCompletion {
+                    self.printCompletion = nil
+                    completion(.success(()))
+                }
+                self.cleanupPrintState()
+            }
+            return
+        }
+
+        cleanupPrintState()
+    }
+
+    private func cleanupPrintState() {
+        if let peripheral = printPeripheral, let manager = centralManager {
+            if peripheral.state == .connected {
+                manager.cancelPeripheralConnection(peripheral)
+            }
+        }
+        printPeripheral = nil
+        writeCharacteristic = nil
+        printZplData = nil
+        targetAddress = nil
+        isConnectingDirectly = false
     }
 
     func requestLocationEnable(completion: @escaping (Result<Bool, Error>) -> Void) {
