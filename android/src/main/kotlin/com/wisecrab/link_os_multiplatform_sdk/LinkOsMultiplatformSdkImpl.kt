@@ -105,17 +105,6 @@ class LinkOsMultiplatformSdkHostApiImpl(
         }.start()
     }
 
-    override fun isBluetoothEnabled(): Boolean {
-        val bluetoothManager =
-            ContextCompat.getSystemService(
-                context,
-                BluetoothManager::class.java
-            )
-        val bluetoothAdapter = bluetoothManager?.adapter
-
-        return bluetoothAdapter?.isEnabled == true
-    }
-
     override fun requestBluetoothEnable(callback: (Result<Boolean>) -> Unit) {
         val bluetoothManager = ContextCompat.getSystemService(
             context,
@@ -142,7 +131,19 @@ class LinkOsMultiplatformSdkHostApiImpl(
         activity!!.startActivityForResult(intent, REQUEST_BLUETOOTH_ENABLE)
     }
 
-    override fun isLocationEnabled(): Boolean {
+    override fun requestLocationEnable(callback: (Result<Boolean>) -> Unit) {
+        if (isLocationEnabled()) {
+            return callback(Result.success(true))
+        }
+        if (activity == null) {
+            return callback(Result.success(false))
+        }
+        requestLocationEnableCallback = callback
+        val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+        activity!!.startActivityForResult(intent, REQUEST_LOCATION_ENABLE)
+    }
+
+    private fun isLocationEnabled(): Boolean {
         val locationManager =
             ContextCompat.getSystemService(context, LocationManager::class.java) ?: return false
 
@@ -156,18 +157,6 @@ class LinkOsMultiplatformSdkHostApiImpl(
                 false
             }
         }
-    }
-
-    override fun requestLocationEnable(callback: (Result<Boolean>) -> Unit) {
-        if (isLocationEnabled()) {
-            return callback(Result.success(true))
-        }
-        if (activity == null) {
-            return callback(Result.success(false))
-        }
-        requestLocationEnableCallback = callback
-        val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-        activity!!.startActivityForResult(intent, REQUEST_LOCATION_ENABLE)
     }
 
     fun onRequestPermissionsResult(

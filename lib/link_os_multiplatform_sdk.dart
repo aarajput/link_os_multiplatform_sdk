@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:link_os_multiplatform_sdk/link_os_multiplatform_sdk.pigeon.dart';
+import 'package:link_os_multiplatform_sdk/utils/image_utils.dart';
 
 class LinkOsMultiplatformSdk {
   static final instance = LinkOsMultiplatformSdk._();
@@ -29,7 +31,29 @@ class LinkOsMultiplatformSdk {
     return _hostApi.requestBluetoothLePermissions();
   }
 
-  Future<void> printOverBluetoothLeWithoutParing(String address, String zpl) {
+  Future<void> printZplOverBluetoothLeWithoutParing(
+    String address,
+    String zpl,
+  ) {
+    return _hostApi.printOverBluetoothLeWithoutParing(address, zpl);
+  }
+
+  Future<void> printImageOverBluetoothLeWithoutParing(
+    String address,
+    Uint8List image, {
+    int threshold = 128,
+    int? labelWidth,
+    int? labelHeight,
+  }) {
+    // Convert image to ZPL format
+    final zpl = ImageUtils.convertImageToZpl(
+      image,
+      threshold: threshold,
+      labelWidth: labelWidth,
+      labelHeight: labelHeight,
+    );
+
+    // Send ZPL to printer via Bluetooth LE
     return _hostApi.printOverBluetoothLeWithoutParing(address, zpl);
   }
 

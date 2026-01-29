@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:link_os_multiplatform_sdk/link_os_multiplatform_sdk.dart';
 import 'package:link_os_multiplatform_sdk/link_os_multiplatform_sdk.pigeon.dart';
 
@@ -99,23 +101,49 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
   }
 
   Future<void> _printToPrinter(String macAddress) async {
-    setState(() {
-      _isPrinting = true;
-    });
+    if (_isPrinting) return;
 
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (BuildContext context) => CupertinoActionSheet(
+        title: const Text('Print options'),
+        actions: <CupertinoActionSheetAction>[
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _printImageToPrinter(macAddress);
+            },
+            child: const Text('Print Image'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _printZplToPrinter(macAddress);
+            },
+            child: const Text('Print ZPL'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _printImageToPrinter(String macAddress) async {
+    setState(() => _isPrinting = true);
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
-
     try {
-      const sampleZpl =
-          '^XA^FO20,20^A0N,25,25^FDTest Print Link OS SDK 1234^FS^XZ';
-      await LinkOsMultiplatformSdk.instance.printOverBluetoothLeWithoutParing(
-        macAddress,
-        sampleZpl,
-      );
+      final byteData = await rootBundle.load('assets/image.png');
+      final imageBytes = byteData.buffer.asUint8List();
+      await LinkOsMultiplatformSdk.instance
+          .printImageOverBluetoothLeWithoutParing(macAddress, imageBytes);
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -131,9 +159,39 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isPrinting = false;
-        });
+        setState(() => _isPrinting = false);
+      }
+    }
+  }
+
+  Future<void> _printZplToPrinter(String macAddress) async {
+    setState(() => _isPrinting = true);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      const sampleZpl =
+          '^XA^FO20,20^A0N,25,25^FDTest Print Link OS SDK 1234^FS^XZ';
+      await LinkOsMultiplatformSdk.instance
+          .printZplOverBluetoothLeWithoutParing(macAddress, sampleZpl);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Print job sent successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error printing: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPrinting = false);
       }
     }
   }
