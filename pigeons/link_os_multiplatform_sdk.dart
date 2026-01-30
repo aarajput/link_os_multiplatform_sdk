@@ -22,7 +22,10 @@ abstract class LinkOsMultiplatformSdkHostApi {
   void startBluetoothLeScanning();
 
   @async
-  void printOverBluetoothLeWithoutParing(String address, String zpl);
+  void printZplOverBluetoothLeWithoutParing(String address, String zpl);
+
+  @async
+  void printPDFOverBluetoothLeWithoutParing(String address, String pdfFilePath);
 
   @async
   bool requestBluetoothEnable();

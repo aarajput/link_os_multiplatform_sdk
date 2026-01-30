@@ -138,7 +138,8 @@ private open class LinkOsMultiplatformSdkPigeonCodec : StandardMessageCodec() {
 interface LinkOsMultiplatformSdkHostApi {
   fun requestBluetoothLePermissions(callback: (Result<Boolean>) -> Unit)
   fun startBluetoothLeScanning(callback: (Result<Unit>) -> Unit)
-  fun printOverBluetoothLeWithoutParing(address: String, zpl: String, callback: (Result<Unit>) -> Unit)
+  fun printZplOverBluetoothLeWithoutParing(address: String, zpl: String, callback: (Result<Unit>) -> Unit)
+  fun printPDFOverBluetoothLeWithoutParing(address: String, pdfFilePath: String, callback: (Result<Unit>) -> Unit)
   fun requestBluetoothEnable(callback: (Result<Boolean>) -> Unit)
   fun requestLocationEnable(callback: (Result<Boolean>) -> Unit)
 
@@ -187,13 +188,33 @@ interface LinkOsMultiplatformSdkHostApi {
         }
       }
       run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printOverBluetoothLeWithoutParing$separatedMessageChannelSuffix", codec)
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printZplOverBluetoothLeWithoutParing$separatedMessageChannelSuffix", codec)
         if (api != null) {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val addressArg = args[0] as String
             val zplArg = args[1] as String
-            api.printOverBluetoothLeWithoutParing(addressArg, zplArg) { result: Result<Unit> ->
+            api.printZplOverBluetoothLeWithoutParing(addressArg, zplArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapError(error))
+              } else {
+                reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapResult(null))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printPDFOverBluetoothLeWithoutParing$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val addressArg = args[0] as String
+            val pdfFilePathArg = args[1] as String
+            api.printPDFOverBluetoothLeWithoutParing(addressArg, pdfFilePathArg) { result: Result<Unit> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(LinkOsMultiplatformSdkPigeonUtils.wrapError(error))

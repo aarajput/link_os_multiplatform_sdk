@@ -13,6 +13,7 @@ import android.os.Looper
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.wisecrab.link_os_multiplatform_sdk.utils.BluetoothPrintManager
 import com.zebra.sdk.btleComm.BluetoothLeConnection
 import com.zebra.sdk.btleComm.BluetoothLeDiscoverer
 import com.zebra.sdk.printer.discovery.DiscoveredPrinter
@@ -72,37 +73,28 @@ class LinkOsMultiplatformSdkHostApiImpl(
         }
     }
 
-    override fun printOverBluetoothLeWithoutParing(
+    override fun printZplOverBluetoothLeWithoutParing(
         address: String,
         zpl: String,
         callback: (Result<Unit>) -> Unit
     ) {
-        Thread {
-            try {
-                // Instantiate insecure connection for given Bluetooth MAC Address.
-                val thePrinterConn = BluetoothLeConnection(address, context)
+        val printManager = BluetoothPrintManager(context, address)
+        BluetoothPrintManager.executePrintJob(
+            printJob = { printManager.printZpl(zpl) },
+            callback = callback
+        )
+    }
 
-                // Initialize
-                Looper.prepare()
-
-                // Open the connection - physical connection is established here.
-                thePrinterConn.open()
-
-                // Send the data to printer as a byte array.
-                thePrinterConn.write(zpl.toByteArray())
-
-                // Make sure the data got to the printer before closing the connection
-                Thread.sleep(500)
-
-                // Close the insecure connection to release resources.
-                thePrinterConn.close()
-                callback(Result.success(Unit))
-
-                Looper.myLooper()?.quit()
-            } catch (e: Exception) {
-                callback(Result.failure(e))
-            }
-        }.start()
+    override fun printPDFOverBluetoothLeWithoutParing(
+        address: String,
+        pdfFilePath: String,
+        callback: (Result<Unit>) -> Unit
+    ) {
+        val printManager = BluetoothPrintManager(context, address)
+        BluetoothPrintManager.executePrintJob(
+            printJob = { printManager.printPdf(pdfFilePath) },
+            callback = callback
+        )
     }
 
     override fun requestBluetoothEnable(callback: (Result<Boolean>) -> Unit) {

@@ -174,14 +174,36 @@ class LinkOsMultiplatformSdkHostApi {
     }
   }
 
-  Future<void> printOverBluetoothLeWithoutParing(String address, String zpl) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printOverBluetoothLeWithoutParing$pigeonVar_messageChannelSuffix';
+  Future<void> printZplOverBluetoothLeWithoutParing(String address, String zpl) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printZplOverBluetoothLeWithoutParing$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[address, zpl]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
+  Future<void> printPDFOverBluetoothLeWithoutParing(String address, String pdfFilePath) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printPDFOverBluetoothLeWithoutParing$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[address, pdfFilePath]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
     if (pigeonVar_replyList == null) {
       throw _createConnectionError(pigeonVar_channelName);

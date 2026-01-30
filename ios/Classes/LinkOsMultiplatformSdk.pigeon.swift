@@ -202,7 +202,8 @@ class LinkOsMultiplatformSdkPigeonCodec: FlutterStandardMessageCodec, @unchecked
 protocol LinkOsMultiplatformSdkHostApi {
   func requestBluetoothLePermissions(completion: @escaping (Result<Bool, Error>) -> Void)
   func startBluetoothLeScanning(completion: @escaping (Result<Void, Error>) -> Void)
-  func printOverBluetoothLeWithoutParing(address: String, zpl: String, completion: @escaping (Result<Void, Error>) -> Void)
+  func printZplOverBluetoothLeWithoutParing(address: String, zpl: String, completion: @escaping (Result<Void, Error>) -> Void)
+  func printPDFOverBluetoothLeWithoutParing(address: String, pdfFilePath: String, completion: @escaping (Result<Void, Error>) -> Void)
   func requestBluetoothEnable(completion: @escaping (Result<Bool, Error>) -> Void)
   func requestLocationEnable(completion: @escaping (Result<Bool, Error>) -> Void)
 }
@@ -243,13 +244,13 @@ class LinkOsMultiplatformSdkHostApiSetup {
     } else {
       startBluetoothLeScanningChannel.setMessageHandler(nil)
     }
-    let printOverBluetoothLeWithoutParingChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printOverBluetoothLeWithoutParing\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let printZplOverBluetoothLeWithoutParingChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printZplOverBluetoothLeWithoutParing\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
-      printOverBluetoothLeWithoutParingChannel.setMessageHandler { message, reply in
+      printZplOverBluetoothLeWithoutParingChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let addressArg = args[0] as! String
         let zplArg = args[1] as! String
-        api.printOverBluetoothLeWithoutParing(address: addressArg, zpl: zplArg) { result in
+        api.printZplOverBluetoothLeWithoutParing(address: addressArg, zpl: zplArg) { result in
           switch result {
           case .success:
             reply(wrapResult(nil))
@@ -259,7 +260,25 @@ class LinkOsMultiplatformSdkHostApiSetup {
         }
       }
     } else {
-      printOverBluetoothLeWithoutParingChannel.setMessageHandler(nil)
+      printZplOverBluetoothLeWithoutParingChannel.setMessageHandler(nil)
+    }
+    let printPDFOverBluetoothLeWithoutParingChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.printPDFOverBluetoothLeWithoutParing\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      printPDFOverBluetoothLeWithoutParingChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let addressArg = args[0] as! String
+        let pdfFilePathArg = args[1] as! String
+        api.printPDFOverBluetoothLeWithoutParing(address: addressArg, pdfFilePath: pdfFilePathArg) { result in
+          switch result {
+          case .success:
+            reply(wrapResult(nil))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      printPDFOverBluetoothLeWithoutParingChannel.setMessageHandler(nil)
     }
     let requestBluetoothEnableChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.com.wisecrab.link_os_multiplatform_sdk.LinkOsMultiplatformSdkHostApi.requestBluetoothEnable\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
