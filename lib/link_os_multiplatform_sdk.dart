@@ -35,7 +35,7 @@ class LinkOsMultiplatformSdk {
     String address,
     String zpl,
   ) {
-    return _hostApi.printOverBluetoothLeWithoutParing(address, zpl);
+    return _hostApi.printZplOverBluetoothLeWithoutParing(address, zpl);
   }
 
   Future<void> printImageOverBluetoothLeWithoutParing(
@@ -54,7 +54,14 @@ class LinkOsMultiplatformSdk {
     );
 
     // Send ZPL to printer via Bluetooth LE
-    return _hostApi.printOverBluetoothLeWithoutParing(address, zpl);
+    return _hostApi.printZplOverBluetoothLeWithoutParing(address, zpl);
+  }
+
+  Future<void> printPDFOverBluetoothLeWithoutParing(
+    String address,
+    String pdfFilePath,
+  ) {
+    return _hostApi.printPDFOverBluetoothLeWithoutParing(address, pdfFilePath);
   }
 
   Future<bool> requestBluetoothEnable() {

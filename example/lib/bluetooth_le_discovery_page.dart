@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:link_os_multiplatform_sdk/link_os_multiplatform_sdk.dart';
 import 'package:link_os_multiplatform_sdk/link_os_multiplatform_sdk.pigeon.dart';
+import 'package:path_provider/path_provider.dart';
 
 class BluetoothLeDiscoveryPage extends StatefulWidget {
   const BluetoothLeDiscoveryPage({super.key});
@@ -118,6 +120,13 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(context);
+              _printPdfToPrinter(macAddress);
+            },
+            child: const Text('Print PDF'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context);
               _printZplToPrinter(macAddress);
             },
             child: const Text('Print ZPL'),
@@ -161,6 +170,45 @@ class _BluetoothLeDiscoveryPageState extends State<BluetoothLeDiscoveryPage> {
       if (mounted) {
         setState(() => _isPrinting = false);
       }
+    }
+  }
+
+  Future<void> _printPdfToPrinter(String macAddress) async {
+    setState(() => _isPrinting = true);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    File? tempFile;
+    try {
+      final byteData = await rootBundle.load('assets/ticket.pdf');
+      final pdfBytes = byteData.buffer.asUint8List();
+      final tempDir = await getTemporaryDirectory();
+      tempFile = File(
+        '${tempDir.path}/ticket_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
+      await tempFile.writeAsBytes(pdfBytes);
+      await LinkOsMultiplatformSdk.instance
+          .printPDFOverBluetoothLeWithoutParing(macAddress, tempFile.path);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Print job sent successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error printing: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPrinting = false);
+      }
+      tempFile?.deleteSync();
     }
   }
 
