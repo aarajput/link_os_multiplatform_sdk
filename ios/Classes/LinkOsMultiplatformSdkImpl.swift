@@ -26,9 +26,13 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
     private var centralManager: CBCentralManager?
     private var bluetoothStateManager: CBCentralManager?
     private var scanningCompletion: ((Result<Void, Error>) -> Void)?
+    private var scanTimeoutWorkItem: DispatchWorkItem?
     private var discoveredPrinters: [String: BluetoothLePrinterData] = [:]
     private var discoveredPeripherals: [String: CBPeripheral] = [:]  // Store peripherals by UUID
     private var isScanning: Bool = false
+
+    /// Duration in seconds for BLE discovery scan. When this elapses, scanning stops and completion is called.
+    private let scanDurationSeconds: TimeInterval = 30
 
     // Printing state
     private var printCompletion: ((Result<Void, Error>) -> Void)?
@@ -222,6 +226,10 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
             return
         }
 
+        // Cancel any existing scan timeout (e.g. from a previous start)
+        scanTimeoutWorkItem?.cancel()
+        scanTimeoutWorkItem = nil
+
         // Scan for ALL BLE devices nearby by searching through the BLE advertisements.
         // Zebra printer broadcasts its printer names in the advertisement.
         // We use nil for services because Zebra printers don't broadcast services in advertisements.
@@ -232,7 +240,25 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
 
         debugPrint("Started BLE scanning for Zebra printers")
 
-        // Complete the scanning start request
+        // Complete only when scanning stops (after duration or when stopped early)
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.completeScanning()
+        }
+        scanTimeoutWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + scanDurationSeconds, execute: workItem)
+    }
+
+    /// Stops BLE discovery scan and calls scanningCompletion. Safe to call from timer or when connecting.
+    private func completeScanning() {
+        scanTimeoutWorkItem?.cancel()
+        scanTimeoutWorkItem = nil
+
+        if isScanning, let manager = centralManager {
+            manager.stopScan()
+            isScanning = false
+            debugPrint("BLE scanning completed")
+        }
+
         if let completion = scanningCompletion {
             scanningCompletion = nil
             completion(.success(()))
@@ -348,7 +374,7 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
         }
     }
 
-    func printOverBluetoothLeWithoutParing(
+    func printZplOverBluetoothLeWithoutParing(
         address: String, zpl: String, completion: @escaping (Result<Void, Error>) -> Void
     ) {
         debugPrint("printOverBluetoothLeWithoutParing: address=\(address), zpl length=\(zpl.count)")
@@ -468,16 +494,21 @@ class LinkOsMultiplatformSdkHostApiImpl: NSObject, LinkOsMultiplatformSdkHostApi
             }
         }
     }
+    
+    func printPDFOverBluetoothLeWithoutParing(
+        address: String, pdfFilePath: String, completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        
+    }
 
     // MARK: - CBPeripheralDelegate for printing
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         debugPrint("Connected to peripheral: \(peripheral.identifier.uuidString)")
 
-        // Stop scanning if we're scanning
+        // Stop scanning if we're in discovery mode; complete the scanning completion so the Dart Future resolves
         if isScanning {
-            central.stopScan()
-            isScanning = false
+            completeScanning()
         }
 
         // Stop scanning if we were connecting directly
