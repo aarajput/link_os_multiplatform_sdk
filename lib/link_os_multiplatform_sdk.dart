@@ -1,8 +1,19 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:link_os_multiplatform_sdk/link_os_multiplatform_sdk.pigeon.dart';
 import 'package:link_os_multiplatform_sdk/utils/image_utils.dart';
+
+/// Top-level function for [compute] to run image-to-ZPL conversion in an isolate.
+String _convertImageToZplInIsolate(({Uint8List image, int threshold, int? labelWidth, int? labelHeight}) args) {
+  return ImageUtils.convertImageToZpl(
+    args.image,
+    threshold: args.threshold,
+    labelWidth: args.labelWidth,
+    labelHeight: args.labelHeight,
+  );
+}
 
 class LinkOsMultiplatformSdk {
   static final instance = LinkOsMultiplatformSdk._();
@@ -44,13 +55,11 @@ class LinkOsMultiplatformSdk {
     int threshold = 128,
     int? labelWidth,
     int? labelHeight,
-  }) {
-    // Convert image to ZPL format
-    final zpl = ImageUtils.convertImageToZpl(
-      image,
-      threshold: threshold,
-      labelWidth: labelWidth,
-      labelHeight: labelHeight,
+  }) async {
+    // Convert image to ZPL format in an isolate to avoid blocking the UI
+    final zpl = await compute(
+      _convertImageToZplInIsolate,
+      (image: image, threshold: threshold, labelWidth: labelWidth, labelHeight: labelHeight),
     );
 
     // Send ZPL to printer via Bluetooth LE
